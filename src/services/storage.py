@@ -135,23 +135,32 @@ class StorageService:
 
         entries: list[DayEntry] = []
         for meta_file in sorted(date_dir.glob("*_meta.json")):
-            meta = EntryMeta.from_dict(json.loads(meta_file.read_text(encoding="utf-8")))
-            prefix = f"{meta.index:03d}"
+            try:
+                meta = EntryMeta.from_dict(json.loads(
+                    meta_file.read_text(encoding="utf-8", errors="replace")
+                ))
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                logger.warning("Skipping corrupted meta file %s: %s", meta_file, e)
+                continue
 
+            prefix = f"{meta.index:03d}"
             text: str | None = None
             voice_path: Path | None = None
 
-            if meta.entry_type == EntryType.VOICE:
-                voice_file = date_dir / f"{prefix}_voice.ogg"
-                if voice_file.exists():
-                    voice_path = voice_file
-                transcript_file = date_dir / f"{prefix}_transcript.txt"
-                if transcript_file.exists():
-                    text = transcript_file.read_text(encoding="utf-8")
-            elif meta.entry_type == EntryType.TEXT:
-                text_file = date_dir / f"{prefix}_text.txt"
-                if text_file.exists():
-                    text = text_file.read_text(encoding="utf-8")
+            try:
+                if meta.entry_type == EntryType.VOICE:
+                    voice_file = date_dir / f"{prefix}_voice.ogg"
+                    if voice_file.exists():
+                        voice_path = voice_file
+                    transcript_file = date_dir / f"{prefix}_transcript.txt"
+                    if transcript_file.exists():
+                        text = transcript_file.read_text(encoding="utf-8", errors="replace")
+                elif meta.entry_type == EntryType.TEXT:
+                    text_file = date_dir / f"{prefix}_text.txt"
+                    if text_file.exists():
+                        text = text_file.read_text(encoding="utf-8", errors="replace")
+            except OSError as e:
+                logger.warning("Failed to read files for entry %s: %s", prefix, e)
 
             entries.append(DayEntry(meta=meta, text=text, voice_path=voice_path))
 
