@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -30,17 +29,18 @@ class CommandHandler:
         )
 
     async def handle_diary(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        force = bool(context.args and context.args[0].lower() == "force")
         await update.effective_message.reply_text("📖 正在整理今日日记，请稍候...")
 
         try:
-            result = await self._pipeline.generate_diary()
+            result = await self._pipeline.generate_diary(force=force)
             await update.effective_message.reply_text(result)
         except Exception as e:
             logger.error("Diary generation failed: %s", e, exc_info=True)
             await update.effective_message.reply_text(f"❌ 日记生成异常：{e}")
 
     async def handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        today = date.today()
+        today = self._storage._today()
         entries = self._storage.get_day_entries(today)
 
         if not entries:
@@ -62,7 +62,7 @@ class CommandHandler:
         )
 
     async def handle_list(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        today = date.today()
+        today = self._storage._today()
         entries = self._storage.get_day_entries(today)
 
         if not entries:

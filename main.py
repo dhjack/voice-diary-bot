@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     config = AppConfig.from_env()
 
-    storage = StorageService(config.data_dir)
+    storage = StorageService(config.data_dir, tz=config.schedule.timezone)
     asr = ASRService(config.asr)
     organizer = OrganizerService(config.llm)
     notion = NotionWriter(config.notion)
@@ -106,7 +106,11 @@ def _setup_scheduler(app: Application, pipeline: DiaryPipeline, config: AppConfi
 
     scheduler.add_job(
         scheduled_diary,
-        trigger=CronTrigger(hour=config.schedule.hour, minute=config.schedule.minute),
+        trigger=CronTrigger(
+            hour=config.schedule.hour,
+            minute=config.schedule.minute,
+            timezone=config.schedule.timezone,
+        ),
         id="daily_diary",
         replace_existing=True,
     )

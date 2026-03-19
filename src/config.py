@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import zoneinfo
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -38,6 +39,7 @@ class NotionConfig:
 class ScheduleConfig:
     hour: int = 22
     minute: int = 0
+    timezone: zoneinfo.ZoneInfo = field(default_factory=lambda: zoneinfo.ZoneInfo("Asia/Shanghai"))
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,7 @@ class AppConfig:
             schedule=ScheduleConfig(
                 hour=int(os.getenv("DIARY_SCHEDULE_HOUR", "22")),
                 minute=int(os.getenv("DIARY_SCHEDULE_MINUTE", "0")),
+                timezone=zoneinfo.ZoneInfo(os.getenv("TZ", "Asia/Shanghai")),
             ),
             data_dir=Path(os.getenv("DATA_DIR", "./data")),
         )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import zoneinfo
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -57,9 +58,16 @@ class DayEntry:
 class StorageService:
     """Manages local file storage organized by date directories."""
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Path, tz: zoneinfo.ZoneInfo | None = None) -> None:
         self._data_dir = data_dir
         self._data_dir.mkdir(parents=True, exist_ok=True)
+        self._tz = tz or zoneinfo.ZoneInfo("Asia/Shanghai")
+
+    def _now(self) -> datetime:
+        return datetime.now(self._tz)
+
+    def _today(self) -> date:
+        return self._now().date()
 
     def _date_dir(self, day: date) -> Path:
         d = self._data_dir / day.isoformat()
@@ -78,7 +86,7 @@ class StorageService:
         duration: float | None = None,
         error_message: str | None = None,
     ) -> EntryMeta:
-        today = date.today()
+        today = self._today()
         idx = self._next_index(today)
         date_dir = self._date_dir(today)
         prefix = f"{idx:03d}"
@@ -96,7 +104,7 @@ class StorageService:
             index=idx,
             entry_type=EntryType.VOICE,
             status=status,
-            timestamp=datetime.now().isoformat(),
+            timestamp=self._now().isoformat(),
             duration=duration,
             error_message=error_message,
         )
@@ -107,7 +115,7 @@ class StorageService:
         return meta
 
     def save_text_entry(self, text: str) -> EntryMeta:
-        today = date.today()
+        today = self._today()
         idx = self._next_index(today)
         date_dir = self._date_dir(today)
         prefix = f"{idx:03d}"
@@ -119,7 +127,7 @@ class StorageService:
             index=idx,
             entry_type=EntryType.TEXT,
             status=EntryStatus.DONE,
-            timestamp=datetime.now().isoformat(),
+            timestamp=self._now().isoformat(),
         )
         meta_path = date_dir / f"{prefix}_meta.json"
         meta_path.write_text(json.dumps(meta.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
@@ -128,7 +136,7 @@ class StorageService:
         return meta
 
     def get_day_entries(self, day: date | None = None) -> list[DayEntry]:
-        day = day or date.today()
+        day = day or self._today()
         date_dir = self._data_dir / day.isoformat()
         if not date_dir.exists():
             return []
@@ -157,9 +165,20 @@ class StorageService:
 
         return entries
 
+    def is_diary_generated(self, day: date | None = None) -> bool:
+        day = day or self._today()
+        marker = self._data_dir / day.isoformat() / ".diary_done"
+        return marker.exists()
+
+    def mark_diary_generated(self, day: date | None = None) -> None:
+        day = day or self._today()
+        marker = self._date_dir(day) / ".diary_done"
+        marker.write_text(self._now().isoformat(), encoding="utf-8")
+        logger.info("Marked diary as generated for %s", day)
+
     def save_diary_markdown(self, content: str, day: date | None = None) -> Path:
         """Save organized diary as local markdown fallback."""
-        day = day or date.today()
+        day = day or self._today()
         path = self._data_dir / f"diary_{day.isoformat()}.md"
         path.write_text(content, encoding="utf-8")
         logger.info("Saved diary markdown for %s", day)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 from src.services.notion_writer import DiaryEntry, NotionWriteError, NotionWriter
 from src.services.organizer import OrganizeResult, OrganizerService
@@ -23,9 +22,13 @@ class DiaryPipeline:
         self._organizer = organizer
         self._notion = notion
 
-    async def generate_diary(self, day: date | None = None) -> str:
-        """Generate and publish diary for a given day. Returns a summary message."""
-        day = day or date.today()
+    async def generate_diary(self, force: bool = False) -> str:
+        """Generate and publish diary for today. Set force=True to regenerate even if already done."""
+        day = self._storage._today()
+
+        if not force and self._storage.is_diary_generated(day):
+            return f"📋 {day.isoformat()} 的日记已经生成过了。如需重新生成，请使用 /diary force"
+
         entries = self._storage.get_day_entries(day)
 
         if not entries:
@@ -47,6 +50,7 @@ class DiaryPipeline:
 
         try:
             page_id = await self._notion.create_diary_page(title=title, diary_entries=diary_entries)
+            self._storage.mark_diary_generated(day)
             voice_count = sum(1 for de in diary_entries if de.voice_upload_id)
             return (
                 f"✅ 日记已写入 Notion！\n"
