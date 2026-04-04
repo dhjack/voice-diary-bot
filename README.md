@@ -26,6 +26,12 @@ cp .env.example .env
 docker compose up -d
 ```
 
+清理 30 天前的数据：
+
+```bash
+./scripts/cleanup_old_data.sh
+```
+
 **本地运行：**
 
 ```bash
