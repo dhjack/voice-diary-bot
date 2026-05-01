@@ -113,6 +113,7 @@ def _setup_scheduler(app: Application, pipeline: DiaryPipeline, config: AppConfi
         ),
         id="daily_diary",
         replace_existing=True,
+        misfire_grace_time=300,
     )
 
     async def start_scheduler(_: Application) -> None:
