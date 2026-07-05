@@ -11,8 +11,8 @@ from src.config import ASRConfig
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES = 1
-RETRY_DELAY_SECONDS = 2
+MAX_RETRIES = 2
+RETRY_DELAY_SECONDS = 3
 
 
 class ASRError(Exception):
@@ -30,7 +30,7 @@ class ASRService:
 
     def __init__(self, config: ASRConfig) -> None:
         self._config = config
-        self._client = httpx.AsyncClient(timeout=60.0)
+        self._client = httpx.AsyncClient(timeout=config.timeout_seconds)
 
     async def transcribe(self, audio_data: bytes) -> ASRResult:
         """Transcribe audio bytes with automatic retry on failure."""
@@ -69,11 +69,18 @@ class ASRService:
             },
         }
 
-        response = await self._client.post(
-            self._config.endpoint,
-            json=payload,
-            headers=headers,
-        )
+        try:
+            response = await self._client.post(
+                self._config.endpoint,
+                json=payload,
+                headers=headers,
+            )
+        except httpx.TimeoutException as e:
+            raise ASRError(
+                f"ASR request timed out after {self._config.timeout_seconds:g}s: {e.__class__.__name__}"
+            ) from e
+        except httpx.HTTPError as e:
+            raise ASRError(f"ASR request failed: {e.__class__.__name__}: {e}") from e
 
         status_code = response.headers.get("X-Api-Status-Code", "")
         message = response.headers.get("X-Api-Message", "")

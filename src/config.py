@@ -20,6 +20,7 @@ class ASRConfig:
     access_token: str
     endpoint: str = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash"
     resource_id: str = "volc.bigasr.auc_turbo"
+    timeout_seconds: float = 300.0
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ class AppConfig:
             asr=ASRConfig(
                 app_key=_require("ASR_APP_KEY"),
                 access_token=_require("ASR_ACCESS_TOKEN"),
+                timeout_seconds=float(os.getenv("ASR_TIMEOUT_SECONDS", "300")),
             ),
             llm=LLMConfig(
                 api_key=_require("LLM_API_KEY"),

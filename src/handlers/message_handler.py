@@ -11,6 +11,11 @@ from src.services.storage import StorageService
 logger = logging.getLogger(__name__)
 
 
+def _error_message(error: Exception) -> str:
+    message = str(error)
+    return message if message else repr(error)
+
+
 class MessageHandler:
     """Handles incoming voice and text messages."""
 
@@ -49,7 +54,7 @@ class MessageHandler:
                 voice_data=bytes(voice_bytes),
                 transcript=None,
                 duration=duration,
-                error_message=str(e),
+                error_message=_error_message(e),
             )
             await message.reply_text(f"⚠️ 转写失败，语音已保存。\n错误：{e}")
         except Exception as e:
@@ -58,7 +63,7 @@ class MessageHandler:
                 voice_data=bytes(voice_bytes),
                 transcript=None,
                 duration=duration,
-                error_message=str(e),
+                error_message=_error_message(e),
             )
             await message.reply_text(f"❌ 处理异常：{e}\n语音已保存，稍后可重试。")
 
