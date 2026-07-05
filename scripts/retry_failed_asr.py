@@ -4,9 +4,12 @@ import argparse
 import asyncio
 import json
 import logging
+import sys
 from datetime import date
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.config import AppConfig
 from src.services.asr import ASRError, ASRService
