@@ -27,7 +27,7 @@ class ASRConfig:
 class LLMConfig:
     api_key: str
     base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
-    model: str = "deepseek-v3-2-251201"
+    model: str = "deepseek-v4-flash-260425"
 
 
 @dataclass(frozen=True)
@@ -75,7 +75,7 @@ class AppConfig:
             llm=LLMConfig(
                 api_key=_require("LLM_API_KEY"),
                 base_url=os.getenv("LLM_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"),
-                model=os.getenv("LLM_MODEL", "deepseek-v3-2-251201"),
+                model=os.getenv("LLM_MODEL", "deepseek-v4-flash-260425"),
             ),
             notion=NotionConfig(
                 token=_require("NOTION_TOKEN"),

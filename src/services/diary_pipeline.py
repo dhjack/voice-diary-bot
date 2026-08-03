@@ -41,8 +41,11 @@ class DiaryPipeline:
         try:
             organize_result = await self._organizer.organize(entries)
         except Exception as e:
-            logger.error("LLM organize failed: %s", e)
-            organize_result = OrganizeResult(title=day.isoformat(), polished_texts=[])
+            logger.error("LLM organize failed: %s", e, exc_info=True)
+            return (
+                f"❌ {day.isoformat()} 日记整理失败：模型服务暂时不可用。\n"
+                "本次未写入 Notion，可稍后使用 /diary 重试。"
+            )
 
         diary_entries = await self._build_diary_entries(entries, organize_result)
 

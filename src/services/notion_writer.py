@@ -104,6 +104,63 @@ class NotionWriter:
         logger.info("Created Notion diary page: %s (title=%s)", page_id, title)
         return page_id
 
+    async def find_diary_pages_by_title(self, title: str) -> list[str]:
+        """Return page IDs in the diary database whose title exactly matches title."""
+        page_ids: list[str] = []
+        cursor: str | None = None
+
+        while True:
+            payload: dict = {
+                "query": title,
+                "filter": {"property": "object", "value": "page"},
+                "page_size": 100,
+            }
+            if cursor:
+                payload["start_cursor"] = cursor
+
+            resp = await self._client.post(
+                f"{NOTION_BASE_URL}/search",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            if resp.status_code != 200:
+                raise NotionWriteError(
+                    f"Failed to search diary pages: {resp.status_code} {resp.text}"
+                )
+
+            data = resp.json()
+            for page in data.get("results", []):
+                parent = page.get("parent", {})
+                if parent.get("database_id") != self._config.database_id:
+                    continue
+                if _page_title(page) == title:
+                    page_ids.append(page["id"])
+
+            if not data.get("has_more"):
+                break
+            cursor = data.get("next_cursor")
+
+        return page_ids
+
+    async def update_diary_title(self, page_id: str, title: str) -> None:
+        """Update only a diary page title, preserving its body and attachments."""
+        resp = await self._client.patch(
+            f"{NOTION_BASE_URL}/pages/{page_id}",
+            json={
+                "properties": {
+                    "title": {
+                        "title": [{"text": {"content": title}}],
+                    },
+                },
+            },
+            headers={"Content-Type": "application/json"},
+        )
+        if resp.status_code != 200:
+            raise NotionWriteError(
+                f"Failed to update diary title: {resp.status_code} {resp.text}"
+            )
+        logger.info("Updated Notion diary page title: %s -> %s", page_id, title)
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -153,3 +210,8 @@ def _chunk_text(text: str, max_len: int) -> list[str]:
     if text:
         chunks.append(text)
     return chunks
+
+
+def _page_title(page: dict) -> str:
+    title_items = page.get("properties", {}).get("title", {}).get("title", [])
+    return "".join(item.get("plain_text", "") for item in title_items)
