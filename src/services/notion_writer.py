@@ -144,11 +144,20 @@ class NotionWriter:
 
     async def update_diary_title(self, page_id: str, title: str) -> None:
         """Update only a diary page title, preserving its body and attachments."""
+        page_resp = await self._client.get(f"{NOTION_BASE_URL}/pages/{page_id}")
+        if page_resp.status_code != 200:
+            raise NotionWriteError(
+                f"Failed to read diary page: {page_resp.status_code} {page_resp.text}"
+            )
+        title_property = _title_property_name(page_resp.json())
+        if not title_property:
+            raise NotionWriteError("Diary page has no title property")
+
         resp = await self._client.patch(
             f"{NOTION_BASE_URL}/pages/{page_id}",
             json={
                 "properties": {
-                    "title": {
+                    title_property: {
                         "title": [{"text": {"content": title}}],
                     },
                 },
@@ -213,5 +222,15 @@ def _chunk_text(text: str, max_len: int) -> list[str]:
 
 
 def _page_title(page: dict) -> str:
-    title_items = page.get("properties", {}).get("title", {}).get("title", [])
+    property_name = _title_property_name(page)
+    if not property_name:
+        return ""
+    title_items = page.get("properties", {}).get(property_name, {}).get("title", [])
     return "".join(item.get("plain_text", "") for item in title_items)
+
+
+def _title_property_name(page: dict) -> str | None:
+    for name, value in page.get("properties", {}).items():
+        if value.get("type") == "title":
+            return name
+    return None
