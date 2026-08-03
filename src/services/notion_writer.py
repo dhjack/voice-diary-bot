@@ -131,7 +131,9 @@ class NotionWriter:
             data = resp.json()
             for page in data.get("results", []):
                 parent = page.get("parent", {})
-                if parent.get("database_id") != self._config.database_id:
+                if not _same_notion_id(
+                    parent.get("database_id", ""), self._config.database_id
+                ):
                     continue
                 if _page_title(page) == title:
                     page_ids.append(page["id"])
@@ -234,3 +236,7 @@ def _title_property_name(page: dict) -> str | None:
         if value.get("type") == "title":
             return name
     return None
+
+
+def _same_notion_id(left: str, right: str) -> bool:
+    return left.replace("-", "").lower() == right.replace("-", "").lower()
