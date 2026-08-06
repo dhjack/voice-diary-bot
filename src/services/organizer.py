@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -10,6 +11,9 @@ from src.config import LLMConfig
 from src.services.storage import DayEntry, EntryType
 
 logger = logging.getLogger(__name__)
+
+MAX_ORGANIZE_ATTEMPTS = 2
+ORGANIZE_RETRY_DELAY_SECONDS = 3
 
 SYSTEM_PROMPT = """你是一个日记整理助手。你的任务是：
 
@@ -42,6 +46,10 @@ class OrganizeResult:
     polished_texts: list[str]
 
 
+class OrganizerResponseError(Exception):
+    """Raised when the model response does not match the diary JSON contract."""
+
+
 class OrganizerService:
     """Polishes diary entries and extracts title using LLM."""
 
@@ -60,18 +68,33 @@ class OrganizerService:
 
         user_content = self._build_user_prompt(entries_with_text)
 
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=0.3,
-            max_tokens=2000,
-        )
+        for attempt in range(1, MAX_ORGANIZE_ATTEMPTS + 1):
+            try:
+                response = await self._client.chat.completions.create(
+                    model=self._model,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=2000,
+                )
 
-        raw = (response.choices[0].message.content or "").strip()
-        return self._parse_response(raw, len(entries_with_text))
+                raw = (response.choices[0].message.content or "").strip()
+                return self._parse_response(raw, len(entries_with_text))
+            except Exception as error:
+                if attempt == MAX_ORGANIZE_ATTEMPTS:
+                    raise
+                logger.warning(
+                    "LLM organize attempt %d/%d failed: %s; retrying",
+                    attempt,
+                    MAX_ORGANIZE_ATTEMPTS,
+                    error,
+                )
+                await asyncio.sleep(ORGANIZE_RETRY_DELAY_SECONDS)
+
+        raise RuntimeError("LLM organize attempts exhausted")
 
     def _build_user_prompt(self, entries: list[DayEntry]) -> str:
         lines: list[str] = []
@@ -90,20 +113,22 @@ class OrganizerService:
 
         try:
             data = json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse LLM JSON response, using fallback")
-            return OrganizeResult(title="日记", polished_texts=[])
+        except json.JSONDecodeError as error:
+            raise OrganizerResponseError("LLM returned invalid JSON") from error
 
-        title = str(data.get("title", "日记")).strip().strip('"\'')
+        if not isinstance(data, dict):
+            raise OrganizerResponseError("LLM JSON response is not an object")
+
+        title = str(data.get("title", "")).strip().strip('"\'')
+        if not title:
+            raise OrganizerResponseError("LLM JSON response has no title")
         polished = data.get("entries", [])
 
         if not isinstance(polished, list) or len(polished) != expected_count:
-            logger.warning(
-                "LLM returned %d entries, expected %d; falling back to original texts",
-                len(polished) if isinstance(polished, list) else 0,
-                expected_count,
+            actual_count = len(polished) if isinstance(polished, list) else 0
+            raise OrganizerResponseError(
+                f"LLM returned {actual_count} entries, expected {expected_count}"
             )
-            return OrganizeResult(title=title, polished_texts=[])
 
         logger.info("Organized: title=%s, %d entries polished", title, len(polished))
         return OrganizeResult(title=title, polished_texts=[str(t) for t in polished])
