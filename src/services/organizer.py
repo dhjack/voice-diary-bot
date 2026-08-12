@@ -79,7 +79,7 @@ class OrganizerService:
                     response_format={"type": "json_object"},
                     extra_body={"thinking": {"type": "disabled"}},
                     temperature=0.3,
-                    max_tokens=2000,
+                    max_tokens=20000,
                 )
 
                 raw = (response.choices[0].message.content or "").strip()
