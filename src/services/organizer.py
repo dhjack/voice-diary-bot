@@ -77,6 +77,7 @@ class OrganizerService:
                         {"role": "user", "content": user_content},
                     ],
                     response_format={"type": "json_object"},
+                    extra_body={"thinking": {"type": "disabled"}},
                     temperature=0.3,
                     max_tokens=2000,
                 )
