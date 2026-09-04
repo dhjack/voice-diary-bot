@@ -51,7 +51,8 @@ That file is intentionally ignored by git and contains machine-specific handoff 
 - Saved failed voice files can be retried with `scripts/retry_failed_asr.py` after the upstream issue is fixed.
 - Diary organization uses an OpenAI-compatible LLM endpoint.
 - LLM output is constrained to JSON, deep reasoning is disabled, and the output limit is 20,000 tokens.
-- Invalid LLM output retries once. If both attempts fail, the diary keeps original text and uses the ISO date as its title.
+- Invalid JSON or a missing title retries once. If both attempts fail, the diary keeps original text and uses the ISO date as its title.
+- If the title is valid but the polished entry count is wrong, keep the generated title and use the original entry texts.
 
 ## Incident Triage
 
@@ -68,7 +69,7 @@ That file is intentionally ignored by git and contains machine-specific handoff 
 
 1. Search logs for `Organized: title=`, JSON parsing errors, and the final Notion title.
 2. Confirm the running container has JSON mode enabled, reasoning disabled, and the intended model ID.
-3. A date-only title means both LLM attempts failed and the fallback behaved as designed.
+3. A date-only title means both LLM attempts failed to return valid JSON with a title and the fallback behaved as designed.
 
 ## ASR Failure Context
 

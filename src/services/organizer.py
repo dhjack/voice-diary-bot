@@ -127,9 +127,12 @@ class OrganizerService:
 
         if not isinstance(polished, list) or len(polished) != expected_count:
             actual_count = len(polished) if isinstance(polished, list) else 0
-            raise OrganizerResponseError(
-                f"LLM returned {actual_count} entries, expected {expected_count}"
+            logger.warning(
+                "LLM returned %d entries, expected %d; keeping title and using original texts",
+                actual_count,
+                expected_count,
             )
+            return OrganizeResult(title=title, polished_texts=[])
 
         logger.info("Organized: title=%s, %d entries polished", title, len(polished))
         return OrganizeResult(title=title, polished_texts=[str(t) for t in polished])
